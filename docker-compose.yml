@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  asylum-scada:
+    build: .
+    container_name: asylum_gate_control
+    privileged: true
+    ports:
+      - "9001:9001"
+    volumes:
+      # Mount docker socket (common escape vector)
+      - /var/run/docker.sock:/var/run/docker.sock
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    environment:
+      - TERM=xterm-256color
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
