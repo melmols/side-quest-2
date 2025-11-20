@@ -9,12 +9,22 @@ echo ""
 
 # Build the Docker image
 echo "Building Docker image..."
-docker-compose build
+# Try docker compose (plugin) first, fallback to docker-compose (standalone)
+if docker compose version &>/dev/null; then
+    docker compose build
+else
+    docker-compose build
+fi
 
 # Start the container
 echo ""
 echo "Starting privileged container..."
-docker-compose up -d
+# Try docker compose (plugin) first, fallback to docker-compose (standalone)
+if docker compose version &>/dev/null; then
+    docker compose up -d
+else
+    docker-compose up -d
+fi
 
 # Wait for container to be ready
 echo ""
@@ -39,5 +49,9 @@ if docker ps | grep -q asylum_gate_control; then
     echo ""
 else
     echo "[✗] Container failed to start. Check logs with:"
-    echo "  docker-compose logs"
+    if docker compose version &>/dev/null; then
+        echo "  docker compose logs"
+    else
+        echo "  docker-compose logs"
+    fi
 fi

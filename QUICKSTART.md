@@ -21,7 +21,7 @@ This will:
 
 ### 2. Build and Run
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 ### 3. Connect to SCADA Terminal

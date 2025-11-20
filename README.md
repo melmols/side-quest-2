@@ -24,12 +24,12 @@ You find yourself inside a privileged Docker container that controls the final g
 
 1. **Build the challenge:**
    ```bash
-   docker-compose build
+   docker compose build
    ```
 
 2. **Start the container:**
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 3. **Access the SCADA terminal:**
@@ -109,7 +109,7 @@ The flag follows the format: `THM{unl0ckth3g4t350fh3ll}`
 To stop and remove the container:
 
 ```bash
-docker-compose down
+docker compose down
 # or
 docker stop asylum_gate_control && docker rm asylum_gate_control
 ```
