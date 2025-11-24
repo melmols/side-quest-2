@@ -222,6 +222,7 @@ To verify it works on boot:
 3. Test the SCADA terminal:
    ```bash
    nc localhost 9001
+   # When prompted, enter Part 1 flag: THM{Y0u_h4ve_b3en_j3stered_739138}
    ```
 
 ## Notes

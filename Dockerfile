@@ -36,10 +36,10 @@ RUN groupadd -g 999 docker || true && \
 RUN mkdir -p /opt/scada && \
     chown scada_operator:scada_operator /opt/scada
 
-# Create flag file in a hidden location (requires root/sudo to access)
+# Create unlock code file in a hidden location (requires root/sudo to access)
 RUN mkdir -p /root/.asylum && \
-    echo "THM{unl0ckth3g4t350fh3ll}" > /root/.asylum/flag && \
-    chmod 600 /root/.asylum/flag
+    echo "739184627" > /root/.asylum/unlock_code && \
+    chmod 600 /root/.asylum/unlock_code
 
 # Copy SCADA application
 COPY scada_terminal.py /opt/scada/

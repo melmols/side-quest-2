@@ -5,7 +5,7 @@ echo "  Asylum Gate Control"
 echo "=========================================="
 echo ""
 
-# Flag is created inside the container during build
+# Unlock code is created inside the container during build
 
 # Build the Docker image
 echo "Building Docker image..."
@@ -41,8 +41,9 @@ if docker ps | grep -q asylum_gate_control; then
     echo ""
     echo "Connect to the SCADA terminal with:"
     echo "  nc localhost 9001"
-    echo "  or"
-    echo "  telnet localhost 9001"
+    echo ""
+    echo "  Note: SCADA terminal requires Part 2 flag for authentication:"
+    echo "        THM{Y0u_h4ve_b3en_j3stered_739138}"
     echo ""
     echo "Or access the container shell with:"
     echo "  docker exec -it asylum_gate_control /bin/bash"

